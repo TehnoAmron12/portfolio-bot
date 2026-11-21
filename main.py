@@ -126,11 +126,14 @@ WHERE project_name=? AND user_id=?
 
 if __name__ == '__main__':
     manager = DB_Manager(DATABASE)
+    manager.create_tables()
     manager.default_insert()
     
-    #manager.insert_project([(12345, 'Бот-портфолио', 'https://github.com', 1)])
-    # manager.insert_skill(12345, 'Бот-портфолио', 'Python')
-    # print("Статусы:", manager.get_statuses())
-    # print("Проекты:", manager.get_projects(12345))
-    # manager.update_projects('description', ('Бот для хранения проектов', 'Бот-портфолио', 12345))
-    #print("Инфо о проекте:", manager.get_project_info(12345, 'Бот-портфолио'))
+    manager.insert_project([(12345, 'Бот-портфолио', 'https://github.com/TehnoAmron12/portfolio-bot.git', 3)])
+    
+    manager.update_projects('description', ('Бот для хранения и управления портфолио проектов', 'Бот-портфолио', 12345))
+
+    manager.insert_skill(12345, 'Бот-портфолио', 'Python')
+    manager.insert_skill(12345, 'Бот-портфолио', 'SQL')
+    
+    print("Инфо о проекте:", manager.get_project_info(12345, 'Бот-портфолио'))
