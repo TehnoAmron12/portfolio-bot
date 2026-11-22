@@ -153,14 +153,23 @@ def link_project(message, data):
         parse_mode='HTML',
         reply_markup=gen_markup(statuses)
     )
-    bot.register_next_step_handler(message, callback_project, data=data)
+    bot.register_next_step_handler(message, callback_project, data=data, statuses=statuses)
 
 
-def callback_project(message, data):
+def callback_project(message, data, statuses):
     if message.text == cancel_button:
         cansel(message)
         return
     status = message.text
+    if status not in statuses:
+        bot.send_message(
+            message.chat.id,
+            "⚠️ Ты выбрал статус не из списка, попробуй еще раз!",
+            reply_markup=gen_markup(statuses)
+        )
+        bot.register_next_step_handler(message, callback_project, data=data, statuses=statuses)
+        return
+
     status_id = manager.get_status_id(status)
     if not status_id:
         bot.send_message(message.chat.id, "⚠️ Такого статуса нет в списке. Попробуйте снова через /new_project.")
@@ -229,6 +238,7 @@ def save_description_step(message, project_name):
     )
 
 
+
 @bot.message_handler(commands=['add_photo'])
 def add_photo_command(message):
     user_id = message.from_user.id
@@ -287,7 +297,7 @@ def save_photo_step(message, project_name):
     with open(save_path, 'wb') as new_file:
         new_file.write(downloaded_file)
 
-        manager.update_projects("photo", (filename, project_name, user_id))
+    manager.update_projects("photo", (filename, project_name, user_id))
     bot.send_message(
         message.chat.id,
         f"✅ Фотография сохранена на диск и прикреплена к проекту <b>«{project_name}»</b>!",
@@ -301,10 +311,10 @@ def get_projects(message):
     user_id = message.from_user.id
     projects = manager.get_projects(user_id)
     if projects:
-        text = "\n".join([f"🔹 <b>{x[2]}</b> — {x[4]}" for x in projects])
+        text = "\n".join([f"🔹 <b>Project name:</b> {x[2]}\n🔗 <b>Link:</b> {x[4]}\n" for x in projects])
         bot.send_message(
             message.chat.id,
-            f"📂 <b>Твои проекты:</b>\n\n{text}\n\n👇 Нажми на проект, чтобы открыть его карточку:",
+            f"📂 <b>Твои проекты:</b>\n\n{text}\n👇 Нажми на проект, чтобы открыть его карточку:",
             parse_mode='HTML',
             reply_markup=gen_inline_markup([x[2] for x in projects])
         )
@@ -434,9 +444,14 @@ def delete_handler(message):
     user_id = message.from_user.id
     projects = manager.get_projects(user_id)
     if projects:
-        text = "\n".join([f"🗑 <b>{x[2]}</b> — {x[4]}" for x in projects])
+        text = "\n".join([f"🗑 <b>Project name:</b> {x[2]}\n🔗 <b>Link:</b> {x[4]}\n" for x in projects])
         projects = [x[2] for x in projects]
-        bot.send_message(message.chat.id, f"{text}\n\nВыберите проект для удаления:", parse_mode='HTML', reply_markup=gen_markup(projects))
+        bot.send_message(
+            message.chat.id,
+            f"{text}\nВыберите проект для удаления:",
+            parse_mode='HTML',
+            reply_markup=gen_markup(projects)
+        )
         bot.register_next_step_handler(message, delete_project, projects=projects)
     else:
         no_projects(message)
@@ -510,47 +525,3 @@ def save_new_status_cmd(message):
         return
     manager.insert_new_status(message.text.strip())
     bot.send_message(message.chat.id, f"✅ Статус <b>«{message.text.strip()}»</b> добавлен в БД!", parse_mode='HTML')
-
-
-@bot.message_handler(commands=['update_status'])
-def update_status_cmd(message):
-    statuses = [x[0] for x in manager.get_statuses()]
-    bot.send_message(message.chat.id, "✏️ Выберите статус для изменения:", reply_markup=gen_markup(statuses))
-    bot.register_next_step_handler(message, ask_updated_status_cmd, statuses=statuses)
-
-
-def ask_updated_status_cmd(message, statuses):
-    if message.text == cancel_button:
-        cansel(message)
-        return
-    if message.text not in statuses:
-        bot.send_message(message.chat.id, "⚠️ Выберите статус с кнопок:", reply_markup=gen_markup(statuses))
-        bot.register_next_step_handler(message, ask_updated_status_cmd, statuses=statuses)
-        return
-    bot.send_message(message.chat.id, f"Введите новое название для статуса «{message.text}»:")
-    bot.register_next_step_handler(message, save_updated_status_cmd, old_status=message.text)
-
-
-def save_updated_status_cmd(message, old_status):
-    if message.text == cancel_button:
-        cansel(message)
-        return
-    manager.update_status(old_status, message.text.strip())
-    bot.send_message(message.chat.id, f"✅ Статус обновлен на <b>«{message.text.strip()}»</b>!", parse_mode='HTML')
-
-
-@bot.message_handler(func=lambda message: True)
-def text_handler(message):
-    user_id = message.from_user.id
-    projects = [x[2] for x in manager.get_projects(user_id)]
-    project = message.text
-    if project in projects:
-        info_project(message, user_id, project)
-        return
-    bot.reply_to(message, "🤔 Тебе нужна помощь? Нажми /info, чтобы посмотреть список команд!")
-
-
-if __name__ == '__main__':
-    manager.create_tables()
-    manager.default_insert()
-    bot.infinity_polling()
